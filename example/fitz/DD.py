@@ -7,8 +7,7 @@ workflow_version = "0.0.1-dev"
 # Xnat Download and Convert
 # --------------------------
 xnat_project = 'Buckholtz_RSA'
-struct_pattern = 'mprage%RMS'
-func_pattern = 'ddt%'
+series_descriptions = ['mprage*RMS', 'ddt*']
 server = 'https://cbscentral.rc.fas.harvard.edu'
 server_alias = 'cbscentral'
 
@@ -17,7 +16,7 @@ server_alias = 'cbscentral'
 func_template = "{subject_id}/images/*dd*"
 anat_template = "{subject_id}/images/*mprage*"
 
-n_runs = 3
+n_runs = 30
 TR = 2.5
 temporal_interp = True
 interleaved = False
