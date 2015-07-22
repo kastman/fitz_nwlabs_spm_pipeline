@@ -379,7 +379,8 @@ class LoadOnsetsInterface(BaseInterface):
         """Return list of pmod bunches extracted from pmod formatted struct/
            cell arrays, or None if no pmods."""
         # If there is a pmod for this condition
-        if cond_pos < mat[pmod_key]['name'][0].shape[0]:
+        if (pmod_key in mat.keys() and
+                cond_pos < mat[pmod_key]['name'][0].shape[0]):
             n_pmods_per_condition = mat[pmod_key]['name'][0][cond_pos].shape[1]
 
             pmod_names = []
