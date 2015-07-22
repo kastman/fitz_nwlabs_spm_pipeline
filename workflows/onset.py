@@ -1,19 +1,10 @@
 """Make SPM *.mat onset files using csv design"""
 # import re
 import os.path as op
-# import numpy as np
-# from scipy import stats, signal
 import pandas as pd
 from scipy.io import savemat
 from numpy import empty
-# import nibabel as nib
-# import matplotlib.pyplot as plt
-# from moss import glm
-# from moss.mosaic import Mosaic
-# import seaborn as sns
-
 from nipype import Node, SelectFiles, Workflow, IdentityInterface, DataSink
-# from nipype.interfaces import fsl
 from nipype.interfaces.base import (BaseInterface,
                                     BaseInterfaceInputSpec,
                                     # InputMultiPath,
