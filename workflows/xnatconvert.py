@@ -48,29 +48,12 @@ def workflow(project, exp, args, subj_source):
         (subj_source, xnatconvert_input, [('subject_id', 'subject_id')])
     ])
 
-    # # Collect raw nifti data
-    # xnatconvert_templates = dict()
-    # #
-    # # Source is a source for both datasource and infosource
-    # # (so files and iterables)
-    # xnatconvert_source = Node(SelectFiles(xnatconvert_templates,
-    #                                       base_directory=project["data_dir"]),
-    #                           "xnatconvert_source")
-    # #
-    # # Convenience class to handle some sterotyped connections
-    # # between run-specific nodes (defined here) and the inputs
-    # # to the prepackaged workflow returned above
-    # xnatconvert_inwrap = fitz.tools.InputWrapper(xnatconvert, subj_source,
-    #     xnatconvert_source, xnatconvert_input)
-    # xnatconvert_inwrap.connect_inputs()
-
-    # Store workflow outputs to persistant location
     xnatconvert_sink = Node(DataSink(base_directory=project['data_dir']),
                             "xnatconvert_sink")
 
     # Similar to above, class to handle sterotyped output connections
-    xnatconvert_outwrap = fitz.tools.OutputWrapper(xnatconvert, subj_source,
-        xnatconvert_sink, xnatconvert_output)
+    xnatconvert_outwrap = fitz.tools.OutputWrapper(
+        xnatconvert, subj_source, xnatconvert_sink, xnatconvert_output)
     xnatconvert_outwrap.set_subject_container()
     xnatconvert_outwrap.add_regexp_substitutions(("_convert\d+\/", ""))
     xnatconvert_outwrap.sink_outputs("images")
@@ -96,8 +79,7 @@ def create_xnatconvert_subject_workflow(name="xnatconvert", exp_info=None):
 
     Outputs:
 
-         outputnode.func_images    : List of output functional 4d NIfTIs
-         outputnode.struct_images  : List of output Structural NIfTI Images
+         outputnode.images    : List of output image NIfTIs
     """
     if exp_info is None:
         exp_info = fitz.default_experiment_parameters()
@@ -117,19 +99,6 @@ def create_xnatconvert_subject_workflow(name="xnatconvert", exp_info=None):
                  ]
 
     inputnode = Node(IdentityInterface(in_fields), "inputs")
-
-    # inputnode.inputs.xnat_config    = set_xnat_config()
-    # inputnode.inputs.server = exp_info['server']
-    # inputnode.inputs.cache_dir      = config.get('dicom_cache_dir', os.path.abspath('./DICOMS'))
-    # inputnode.inputs.struct_offset  = config.get('struct_offset',0)
-
-    # inputnode.inputs.struct_offset = exp_info['struct_offset']
-    # inputnode.inputs.func_offset = exp_info['func_offset']
-
-    # inputnode.inputs.func_offset    = config.get('func_offset',0)
-    # inputnode.inputs.exam_id        = config['examid']
-    # inputnode.inputs.session_label  = config['subid']
-    # inputnode.inputs.subject_id     = config['subid']
     inputnode.inputs.xnat_project = exp_info['xnat_project']
     inputnode.inputs.series_descriptions = exp_info['series_descriptions']
 
@@ -144,7 +113,6 @@ def create_xnatconvert_subject_workflow(name="xnatconvert", exp_info=None):
     inputnode.inputs.server_alias = exp_info['server_alias']
 
     pattern_flow = create_xnatconvert_flow(name='xnatconvert_subflow')
-    # func_flow = create_xnatconvert_flow(name='xnatconvert_func')
 
     xnatconvert_subject = Workflow(name)
     xnatconvert_subject.connect([
@@ -153,29 +121,9 @@ def create_xnatconvert_subject_workflow(name="xnatconvert", exp_info=None):
              ('offsets', 'xnatSearch.series_offset'),
              ('subject_id', 'xnatSearch.session_label'),
              ('xnat_project', 'xnatSource.xnat_project'),
-            #  ('subject_id', 'xnatSource.subject_id'),
-            #  ('subject_id', 'xnatSource.exam_id'),
              ('server_alias', 'xnatServerConfig.alias'),
              ]),
-        # (inputnode, func_flow,
-        #     [('func_pattern', 'xnatSearch.desc_pattern'),
-        #      ('func_offset', 'xnatSearch.series_offset'),
-        #      ('subject_id', 'xnatSearch.session_label'),
-        #      ('xnat_project', 'xnatSource.xnat_project'),
-        #     #  ('subject_id', 'xnatSource.subject_id'),
-        #      ('subject_id', 'xnatSource.exam_id'),
-        #      ('server_alias', 'xnatServerConfig.alias')
-        #      ]),
     ])
-
-        # (inputnode, xnatSource,
-            # [('xnat_project', 'xnatSource.xnat_project'),
-            #  ('subject_id', 'xnatSource.subject_id'),
-            #  ('exam_id', 'exam_id'),
-            #  (('xnat_config', get_val_for, 'user' ), 'user'),
-            #  (('xnat_config', get_val_for, 'pwd' ), 'pwd'),
-            #  (('xnat_config', get_val_for, 'server' ), 'server')]),
-
 
     # Define the outputs of the top-level workflow
     output_fields = ["images"]
@@ -230,112 +178,27 @@ def create_xnatconvert_flow(name):
 def select_dicoms(lists):
     if not isinstance(lists[0], list):
         lists = [lists]
-    # return [[item for item in l if item.endswith('dcm') or item.endswith('IMA')] for l in lists]
     return lists
 
 
 def clean_list(images_list):
-    flatten = lambda nested_list: [item for sublist in nested_list for item in sublist]
+    def flatten(nested_list):
+        return [item for sublist in nested_list for item in sublist]
     if isinstance(images_list[0], list):
         dicoms = flatten(images_list)
     else:
         dicoms = images_list
-    return [item for item in dicoms if item.endswith('dcm') or item.endswith('IMA')]
+    return [item for item in dicoms
+            if item.endswith('dcm') or item.endswith('IMA')]
 
 
 def get_val_for(d, key):
     return d[key]
 
-    # # Define Nodes for Manual QC Checks
-    # # =================================
-    # if checkManualQc:
-    #     def get_qcQuery(exam_id,scan_ids=[]):
-    #         # scan_id is not a scan's uid, but more like series number.
-    #         # However, xnat calls it scan_id, so we're staying with xnat's
-    #         # query nomenclature for consistency.
-    #         query = [('neuroinfo:manualboldqc/EXPT_ID','LIKE','%s%%' % exam_id)]
-    #         scan_params = [('neuroinfo:manualboldqc/SCAN_ID','LIKE',str(id)) for id in scan_ids]
-    #         scan_params.append('OR')
-    #         query.append(scan_params)
-    #         query.append('AND')
-    #
-    #         # query = [('neuroinfo:manualboldqc/EXPT_ID','LIKE','%s%%' % exam_id),
-    #         #            [  ('neuroinfo:manualboldqc/SCAN_ID','LIKE','9'),
-    #         #               ('neuroinfo:manualboldqc/SCAN_ID','LIKE','12'),
-    #         #               'OR'],
-    #         #            'AND']
-    #
-    #         return query
-    #
-    #     build_qcQuery = pe.Node(interface=util.Function(input_names=['exam_id','scan_ids'],
-    #                                 output_names=['query'],
-    #                                 function=get_qcQuery),
-    #                             name='build_qcQuery', run_without_submitting=True)
-    #
-    #     qcSearch = pe.Node(interface=cbscentral_interfaces.XnatQuery(), name='qcSearch')
-    #     qcSearch.inputs.query_datatype = 'neuroinfo:manualboldqc'
-    #
-    #     def choose_scans(scan_ids, scan_qcs, remove=['FAIL']):
-    #         """ Select Scans and Run Numbers/Orders of scans with passing Manual QC Checks
-    #         """
-    #         passing_scans = []
-    #         passing_orders = []
-    #         use_all = False if scan_qcs else True  # Use all scans if NO assessments were found
-    #         if use_all:
-    #             passing_scans = scan_ids
-    #             passing_orders = range(len(scan_ids))
-    #
-    #
-    #         for order, scan_id in enumerate(scan_ids):
-    #             qc = scan_qcs.where(scan_id=str(scan_id))
-    #             if qc.has_header('overall'):
-    #                 if qc['overall'] not in remove:
-    #                     passing_scans.append(scan_id)
-    #                     passing_orders.append(order)
-    #                     scan_msg = "%sed Manual QC - %s" % (qc['overall'].capitalize(), qc['comments'])
-    #                 else:
-    #                     scan_msg = "Failed Manual QC - %s\n%s" % (qc['comments'], qc.dumps_json())
-    #             else:
-    #                 scan_msg = "No Manual Assessment found."
-    #             print "Scan Series %s: %s" % (scan_id, scan_msg)
-    #
-    #         if not passing_scans:
-    #             raise RuntimeError("No scans passed Manual QC.")
-    #         elif len(passing_scans) == 1:
-    #             raise RuntimeError("Only 1 passing scan found. Aborting.")
-    #
-    #         return passing_scans, passing_orders
-    #
-    #     qcSelect = pe.Node(interface=util.Function(input_names=['scan_ids','scan_qcs'],
-    #                                                output_names=['passing_scans','passing_orders'],
-    #                                                function=choose_scans), name='qcSelect', run_without_submitting=True)
-    #     outputnode_fields.extend(['scan_nums','runs'])
-    #
-    # outputnode = pe.Node(interface=util.IdentityInterface(fields=outputnode_fields), name='outputnode', run_without_submitting=True)
 
-def exam_cache_dir(cache_dir,exam_id):
+def exam_cache_dir(cache_dir, exam_id):
     import os
-    return os.path.join(cache_dir,exam_id)
-
-    #
-    # if checkManualQc:
-    #     workflow.connect([
-    #         (inputnode, qcSearch, [(('xnat_config', get_val_for, 'user' ), 'user'),
-    #                                (('xnat_config', get_val_for, 'pwd' ), 'pwd'),
-    #                                (('xnat_config', get_val_for, 'server' ), 'server')]),
-    #         (inputnode, build_qcQuery,      [('exam_id', 'exam_id')]),
-    #         (xnatFuncSearch, build_qcQuery, [('scan', 'scan_ids')]),
-    #         (build_qcQuery, qcSearch,       [('query', 'query')]),
-    #         (xnatFuncSearch, qcSelect,      [('scan', 'scan_ids')]),
-    #         (qcSearch, qcSelect,            [('result', 'scan_qcs')]),
-    #         (qcSelect, outputnode,          [('passing_scans', 'scan_nums'),
-    #                                          ('passing_orders', 'runs')]),
-    #         (qcSelect, xnatFuncSource,      [('passing_scans', 'scan')])
-    #     ])
-    # else:
-    #     workflow.connect([
-    #         (xnatFuncSearch, xnatFuncSource, [('scan', 'scan')]),
-    #     ])
+    return os.path.join(cache_dir, exam_id)
 
 
 def create_serverconfig(name):
@@ -395,6 +258,7 @@ class XnatServerConfigInterfaceOutputSpec(TraitedSpec):
     server = traits.String(desc="Server address")
     config = traits.Dict(desc="Credentials as dict")
 
+
 class XnatServerConfigInterface(BaseInterface):
     input_spec = XnatServerConfigInterfaceInputSpec
     output_spec = XnatServerConfigInterfaceOutputSpec
@@ -417,7 +281,6 @@ class XnatServerConfigInterface(BaseInterface):
     def _read_auth(self, config_file):
         dom = xml.etree.ElementTree.parse(config_file).getroot()
         return dom.findall(self.inputs.alias)[0]
-
 
     def _list_outputs(self):
         outputs = self._outputs().get()
@@ -443,6 +306,7 @@ class XnatSearchInterfaceOutputSpec(TraitedSpec):
     scans = traits.List(traits.Int(), desc="Scan Numbers to Retrieve")
     subject = traits.String(desc="Xnat subject id")
     exam = traits.String(desc="Xnat exam id")
+
 
 class XnatSearchInterface(BaseInterface):
     input_spec = XnatSearchInterfaceInputSpec
