@@ -465,7 +465,7 @@ class XnatSearchInterface(BaseInterface):
         outputs["exam"] = self.exam
         return outputs
 
-    def xnat_search(self, session_label, series_pattern, xnat_config,
+    def xnat_search(self, session_label, series_label, xnat_config,
                     series_offset=0):
         from pyxnat import Interface
 
@@ -474,9 +474,11 @@ class XnatSearchInterface(BaseInterface):
                             password=xnat_config['pwd'])
 
         if self.inputs.sanitize_wildcard:
-            session_pattern = session_label.replace('*', '%')
+            session_pattern = '%%%s%%' % session_label.replace('*', '%')
+            series_pattern = '%%%s%%' % series_label.replace('*', '%')
         else:
             session_pattern = session_label
+            series_pattern = series_label
 
         results = central.select(
             'xnat:mrscandata',
@@ -493,7 +495,6 @@ class XnatSearchInterface(BaseInterface):
             ('120613_PrP004', '14', 'usable'),
             ('120613_PrP004', '21', 'usable')]
         """
-        print results
         if len(results.items()) == 0:
             raise LookupError("No scans found using %s and %s" % (
                 series_pattern, session_pattern))
@@ -501,5 +502,4 @@ class XnatSearchInterface(BaseInterface):
         scans = [int(result[3]) + series_offset for result in results.items()]
         subject = results.data[0]['xnat_mrsessiondata_subject_id']
         exam = results.data[0]['xnat_mrsessiondata_session_id']
-        print subject, exam
         return scans, subject, exam

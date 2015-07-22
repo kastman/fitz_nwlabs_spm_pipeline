@@ -14,7 +14,7 @@ from nipype import Node, Workflow, IdentityInterface, SelectFiles, DataSink
 # from nipype.interfaces import fsl
 from nipype.interfaces import spm
 from nipype.pipeline import engine as pe
-from nipype.algorithms import rapidart as ra, modelgen as model
+from nipype.algorithms import modelgen as model
 from nipype.interfaces.base import (BaseInterface,
                                     BaseInterfaceInputSpec,
                                     InputMultiPath,
@@ -52,7 +52,8 @@ def workflow(project, exp, args, subj_source):
         onset_files=op.join(model_base, "models",
                             exp["model_name"], "onset",
                             "%s-%s*run*.mat" % (exp["exp_name"],
-                                                exp["model_name"]))
+                                                exp["model_name"])),
+        outlier_files=op.join(model_base, "preproc", "art*.txt")
         )
 
     # if exp["design_name"] is not None:
@@ -92,7 +93,8 @@ def create_timeseries_model_workflow(name="model", exp_info=None):
         exp_info = fitz.default_experiment_parameters()
 
     # Define constant inputs
-    inputs = ["realignment_params", "timeseries", "onset_files"]
+    inputs = ["realignment_params", "timeseries", "onset_files",
+              "outlier_files"]
     #
     # # Possibly add the design and regressor files to the inputs
     # if exp_info["design_name"] is not None:
@@ -102,8 +104,6 @@ def create_timeseries_model_workflow(name="model", exp_info=None):
 
     # Define the workflow inputs
     inputnode = Node(IdentityInterface(inputs), "inputs")
-
-    art = create_artifactdetect()
 
     load_onsets = pe.Node(interface=LoadOnsetsInterface(),
                           name='load_onsets')
@@ -124,18 +124,14 @@ def create_timeseries_model_workflow(name="model", exp_info=None):
     model = Workflow(name=name)
 
     model.connect([
-        (inputnode, art,
-            [('realignment_params', 'realignment_parameters'),
-             ('timeseries', 'realigned_files')]),
         (inputnode, load_onsets,
             [('onset_files', 'onset_files')]),
         (inputnode, modelspec,
             [('realignment_params', 'realignment_parameters'),
-             ('timeseries', 'functional_runs')]),
+             ('timeseries', 'functional_runs'),
+             ('outlier_files', 'outlier_files')]),
         (load_onsets, modelspec,
             [('onsets_infos', 'subject_info')]),
-        (art, modelspec,
-            [('outlier_files', 'outlier_files')]),
         (modelspec, level1design,
             [('session_info', 'session_info')]),
         (level1design, level1estimate,
@@ -154,7 +150,6 @@ def create_timeseries_model_workflow(name="model", exp_info=None):
                                          "con_images",
                                          "spmT_images",
                                          "spm_mat_file",
-                                         "outlier_files",
                                          #  "censor_rpt",
                                          #  "censor_csv",
                                          #  "censor_json",
@@ -171,8 +166,6 @@ def create_timeseries_model_workflow(name="model", exp_info=None):
             [('con_images', 'con_images'),
              ('spmT_images', 'spmT_images'),
              ('spm_mat_file', 'spm_mat_file')]),
-        (art, outputnode,
-            [('outlier_files', 'outlier_files')]),
         # (threshold_outliers, outputnode,
         #     [('censor_rpt', 'censor_rpt'),
         #      ('censor_csv', 'censor_csv'),
@@ -186,23 +179,6 @@ def create_timeseries_model_workflow(name="model", exp_info=None):
 # Northwest Labs Preprocessing Shared Workflows                               #
 # ekk 12Nov12                                                                 #
 # =========================================================================== #
-
-
-def create_artifactdetect(name='art'):
-    """Use :class:`nipype.algorithms.rapidart` to determine which of the
-    images in the functional series are outliers based on deviations in
-    intensity or movement.
-    """
-    art = pe.Node(interface=ra.ArtifactDetect(), name=name)
-    art.inputs.use_differences = [True, False]
-    art.inputs.use_norm = True
-    art.inputs.norm_threshold = 1
-    art.inputs.zintensity_threshold = 3
-    art.inputs.mask_type = 'spm_global'
-    art.inputs.parameter_source = 'SPM'
-    art.inputs.save_plot = False  # Don't save plots when running on cluster
-
-    return art
 
 
 def create_modelspec(exp_info, name='modelspec'):

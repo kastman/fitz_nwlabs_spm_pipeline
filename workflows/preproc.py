@@ -11,17 +11,21 @@ from nipype.interfaces import spm
 from nipype.pipeline import engine as pe
 from nipype import (Node, MapNode, SelectFiles, Workflow,
                     IdentityInterface, DataSink)
+from nipype.algorithms import rapidart as ra
 from nipype.interfaces.base import (BaseInterface,
                                     BaseInterfaceInputSpec,
                                     File,
                                     traits,
-#                                     InputMultiPath, OutputMultiPath,
-#                                     TraitedSpec
-)
+                                    # InputMultiPath, OutputMultiPath,
+                                    # TraitedSpec
+                                    )
 
 import fitz
-from fitz.tools import (SingleInFile, SingleOutFile, ManyOutFiles,
-                        list_out_file)
+from fitz.tools import (  # SingleInFile,
+                        SingleOutFile,
+                        # ManyOutFiles,
+                        # list_out_file
+                        )
 from nibabel import load as nib_load, Nifti1Pair
 
 
@@ -151,6 +155,8 @@ def create_preprocessing_workflow(name="preproc", exp_info=None):
 
     realign = create_realignment()
 
+    art = create_artifactdetect()
+
     # Estimate a registration from funtional to anatomical space
     coregister = create_coregister()
 
@@ -195,6 +201,12 @@ def create_preprocessing_workflow(name="preproc", exp_info=None):
         ])
 
     preproc.connect([
+        (inputnode, art,
+            [('timeseries', 'realigned_files')]),
+        (realign, art,
+            [('realignment_parameters', 'realignment_parameters'),
+             # ('modified_in_files', 'realigned_files')  # If ra img gets fixed
+            ]),
         (inputnode, coregister,
             [(('anat', first_item), 'target')]),
         (inputnode, segment,
@@ -221,11 +233,14 @@ def create_preprocessing_workflow(name="preproc", exp_info=None):
                      "transformation_mat",
                      "forward_deformation_field",
                      "native_class_images",
-                     "json_file"]
+                     "json_file",
+                     "outlier_files"]
 
     outputnode = Node(IdentityInterface(output_fields), "outputs")
 
     preproc.connect([
+        (art, outputnode,
+            [("outlier_files", "outlier_files")]),
         (realign, outputnode,
             [("realignment_parameters", "realignment_parameters")]),
         (smooth, outputnode,
@@ -283,6 +298,7 @@ class PrepTimeseries(BaseInterface):
         outputs = self._outputs().get()
         outputs["out_file"] = op.abspath(self.fname)
         return outputs
+
 
 def create_slicetiming(TR, slice_order_label, interleaved, num_slices):
     slicetiming = pe.Node(interface=spm.SliceTiming(), name="slicetiming")
@@ -372,3 +388,16 @@ def create_smooth(fwhm=6, name='smooth'):
     smooth.inputs.fwhm = fwhm
 
     return smooth
+
+
+def create_artifactdetect(name='art'):
+    art = pe.Node(interface=ra.ArtifactDetect(), name=name)
+    art.inputs.use_differences = [True, False]
+    art.inputs.use_norm = True
+    art.inputs.norm_threshold = 1
+    art.inputs.zintensity_threshold = 3
+    art.inputs.mask_type = 'spm_global'
+    art.inputs.parameter_source = 'SPM'
+    art.inputs.save_plot = False  # Don't save plots when running on cluster
+
+    return art
