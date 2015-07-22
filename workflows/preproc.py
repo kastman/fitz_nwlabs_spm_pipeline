@@ -160,7 +160,8 @@ def create_preprocessing_workflow(name="preproc", exp_info=None):
     apply_deform_func = create_apply_deformation(spminfo, 'apply_deform_func')
 
     """Apply Deformation to Structurals"""
-    apply_deform_struct = create_apply_deformation(spminfo, 'apply_deform_struct')
+    apply_deform_struct = create_apply_deformation(spminfo,
+                                                   'apply_deform_struct')
 
     smooth = create_smooth()
 

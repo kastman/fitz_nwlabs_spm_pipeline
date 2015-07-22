@@ -1,7 +1,7 @@
 """Timeseries model using SPM"""
 # import re
 import os.path as op
-from numpy import isnan
+from numpy import isnan, any as np_any
 from scipy.io import loadmat
 # import pandas as pd
 # import nibabel as nib
@@ -29,7 +29,8 @@ import fitz
 def default_parameters():
     return dict(
         condition_names=[],
-        contrasts=[]
+        contrasts=[],
+        concatenate_runs=False
     )
 
 
@@ -42,14 +43,16 @@ def workflow(project, exp, args, subj_source):
     model, model_input, model_output = create_timeseries_model_workflow(
         name="model", exp_info=exp)
 
-    model_base = op.join(project['analysis_dir'], "{subject_id}/preproc/")
+    model_base = op.join(project['analysis_dir'], "{subject_id}")
     model_templates = dict(
-        timeseries=op.join(model_base,
+        timeseries=op.join(model_base, "preproc",
                            'sw*%s*.img' % op.splitext(
                                 op.basename(exp["source_template"]))[0]),
-        realignment_params=op.join(model_base, "rp*.txt"),
-        onset_files=op.join(project['analysis_dir'],
-                            "{subject_id}/onset/*run*.mat")
+        realignment_params=op.join(model_base, "preproc", "rp*.txt"),
+        onset_files=op.join(model_base, "models",
+                            exp["model_name"], "onset",
+                            "%s-%s*run*.mat" % (exp["exp_name"],
+                                                exp["model_name"]))
         )
 
     # if exp["design_name"] is not None:
@@ -75,7 +78,7 @@ def workflow(project, exp, args, subj_source):
                                              model_sink, model_output)
     model_outwrap.set_subject_container()
     model_outwrap.set_mapnode_substitutions(exp["n_runs"])
-    model_outwrap.sink_outputs("model")
+    model_outwrap.sink_outputs("models/%s/model" % exp['model_name'])
 
     # Set temporary output locations
     model.base_dir = project['working_dir']
@@ -109,7 +112,6 @@ def create_timeseries_model_workflow(name="model", exp_info=None):
     modelspec = create_modelspec(exp_info)
 
     level1design = create_level1design(exp_info)
-    level1design.inputs.bases = exp_info['bases']
 
     level1estimate = create_level1estimate(exp_info)
 
@@ -209,7 +211,7 @@ def create_modelspec(exp_info, name='modelspec'):
     """
     modelspec = pe.Node(interface=model.SpecifySPMModel(),
                         name="modelspec", run_without_submitting=True)
-    modelspec.inputs.concatenate_runs = False
+    modelspec.inputs.concatenate_runs = exp_info['concatenate_runs']
     modelspec.inputs.input_units = exp_info['input_units']
     modelspec.inputs.output_units = 'secs'
     modelspec.inputs.high_pass_filter_cutoff = exp_info['hpcutoff']
@@ -297,7 +299,7 @@ class LoadOnsetsInterface(BaseInterface):
             # address one level in, and then to get each item address one level
             # in again.
             nConditions = len(mat['names'][0])
-            names, durations, onsets = [], [], []
+            names, durations, onsets, pmods = [], [], [], []
 
             for i in range(nConditions):
                 # Go through each condition and cast it into Stdlibrary strings
@@ -320,6 +322,10 @@ class LoadOnsetsInterface(BaseInterface):
                 names.append(name)
                 durations.append(duration)
                 onsets.append(onset)
+
+                pmod = self._get_pmods(mat, i)
+                if pmod:
+                    pmods.append(pmod)
 
             if conditions_list:
                 for cond in conditions_list:
@@ -356,13 +362,50 @@ class LoadOnsetsInterface(BaseInterface):
                                "values, but continuing anyway..."
                                % (names[index], srcmat))
 
-            self.onsets_infos.append(Bunch(dict(
+            onset_info = Bunch(dict(
                 conditions=names,
                 onsets=onsets,
                 durations=durations
-            )))
+            ))
+
+            if len(pmods):
+                onset_info.pmod = pmods
+
+            self.onsets_infos.append(onset_info)
 
         return runtime
+
+    def _get_pmods(self, mat, cond_pos, pmod_key='pmod'):
+        """Return list of pmod bunches extracted from pmod formatted struct/
+           cell arrays, or None if no pmods."""
+        # If there is a pmod for this condition
+        if cond_pos < mat[pmod_key]['name'][0].shape[0]:
+            n_pmods_per_condition = mat[pmod_key]['name'][0][cond_pos].shape[1]
+
+            pmod_names = []
+            pmod_params = []
+            pmod_polys = []
+            for p in range(n_pmods_per_condition):
+                p_name = mat[pmod_key]['name'][0][cond_pos][0][p][0]
+                p_param = mat[pmod_key]['param'][0][cond_pos][0][p][0]
+                p_poly = mat[pmod_key]['poly'][0][cond_pos][0][p][0]
+
+                if np_any(p_param):
+                    pmod_names.append(p_name),
+                    pmod_params.append(p_param.tolist()),
+                    pmod_polys.append(p_poly.tolist())
+                else:
+                    print "WARN - Empty pmod for %s" % p_name
+            if len(pmod_names):
+                pmod = Bunch(
+                    name=pmod_names,
+                    param=pmod_params,
+                    poly=pmod_polys
+                )
+            else:
+                pmod = None
+
+            return pmod
 
     def _list_outputs(self):
         outputs = self._outputs().get()
