@@ -6,7 +6,7 @@ workflow_version = "0.0.1-dev"
 
 # Xnat Download and Convert
 # --------------------------
-xnat_project = 'Buckholtz_RSA'
+xnat_project = 'FitzTutorial'
 series_descriptions = ['mprage*RMS', 'ddt*']
 server = 'https://cbscentral.rc.fas.harvard.edu'
 server_alias = 'cbscentral'
