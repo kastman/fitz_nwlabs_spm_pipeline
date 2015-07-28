@@ -15,14 +15,23 @@ from nipype.interfaces.base import (BaseInterface,
 import fitz
 # from fitz.tools import ManyOutFiles, SaveParameters, nii_to_png
 
+default_parameters = dict(
+    conditions=[],
+    condition_col='condition',
+    duration_col='duration',
+    onset_col='onset',
+    run_col='run',
+    pmod_cols=[],
+    concatenate_runs=False
+)
 
-def workflow(project, exp, args, subj_source):
+def workflow_manager(project, exp, args, subj_source):
     # ----------------------------------------------------------------------- #
     # Create Onsets
     # ----------------------------------------------------------------------- #
 
     # Create SPM.mat onsets files from design file.
-    onset, onset_input, onset_output = create_onset_workflow(exp_info=exp)
+    onset, onset_input, onset_output = workflow_spec(exp_info=exp)
     onset_base = op.join(project['data_dir'], "{subject_id}/design")
     design_file = exp["design_name"] + ".csv"
     onset_templates = dict(
@@ -52,10 +61,10 @@ def workflow(project, exp, args, subj_source):
     return onset
 
 
-def create_onset_workflow(name="onset", exp_info=None):
+def workflow_spec(name="onset", exp_info=None):
     # Default experiment parameters
     if exp_info is None:
-        exp_info = fitz.default_experiment_parameters()
+        exp_info = fitz.default_experiment_parameters
 
     # Define constant inputs
     inputs = ["design_file"]
@@ -313,15 +322,3 @@ class OnsetSetup(BaseInterface):
         # outputs["design_matrix_pkl"] = op.abspath("design.pkl")
         # outputs["design_matrix_file"] = op.abspath("design.mat")
         return outputs
-
-
-def default_parameters():
-    return dict(
-        conditions=[],
-        condition_col='condition',
-        duration_col='duration',
-        onset_col='onset',
-        run_col='run',
-        pmod_cols=[],
-        concatenate_runs=False
-    )

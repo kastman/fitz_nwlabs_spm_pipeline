@@ -26,22 +26,21 @@ from nipype.interfaces.base import (BaseInterface,
 import fitz
 
 
-def default_parameters():
-    return dict(
-        condition_names=[],
-        contrasts=[],
-        concatenate_runs=False
-    )
+default_parameters = dict(
+    condition_names=[],
+    contrasts=[],
+    concatenate_runs=False
+)
 
 
-def workflow(project, exp, args, subj_source):
+def workflow_manager(project, exp, args, subj_source):
     # ----------------------------------------------------------------------- #
     # Timeseries Model
     # ----------------------------------------------------------------------- #
 
     # Create a modelfitting workflow and specific nodes as above
-    model, model_input, model_output = create_timeseries_model_workflow(
-        name="model", exp_info=exp)
+    model, model_input, model_output = workflow_spec(name="model",
+                                                     exp_info=exp)
 
     model_base = op.join(project['analysis_dir'], "{subject_id}")
     model_templates = dict(
@@ -87,10 +86,10 @@ def workflow(project, exp, args, subj_source):
     return model
 
 
-def create_timeseries_model_workflow(name="model", exp_info=None):
+def workflow_spec(name="model", exp_info=None):
     # Default experiment parameters for generating graph image, testing, etc.
     if exp_info is None:
-        exp_info = fitz.default_experiment_parameters()
+        exp_info = fitz.default_experiment_parameters
 
     # Define constant inputs
     inputs = ["realignment_params", "timeseries", "onset_files",

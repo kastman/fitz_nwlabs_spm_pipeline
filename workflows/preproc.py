@@ -29,23 +29,22 @@ from fitz.tools import (  # SingleInFile,
 from nibabel import load as nib_load, Nifti1Pair
 
 
-def default_parameters():
-    return dict(
-        n_runs=0,
-        TR=2,
-        frames_to_toss=0,
-        temporal_interp=False,
-        interleaved=True,
-        slice_order="up",
-        intensity_threshold=4.5,
-        motion_threshold=1,
-        spike_threshold=None,
-        smooth_fwhm=6,
-        hpf_cutoff=128,
-    )
+default_parameters = dict(
+    n_runs=0,
+    TR=2,
+    frames_to_toss=0,
+    temporal_interp=False,
+    interleaved=True,
+    slice_order="up",
+    intensity_threshold=4.5,
+    motion_threshold=1,
+    spike_threshold=None,
+    smooth_fwhm=6,
+    hpf_cutoff=128,
+)
 
 
-def workflow(project, exp, args, subj_source):
+def workflow_manager(project, exp, args, subj_source):
     """
     # ---------------------- #
     # Preprocessing Workflow #
@@ -55,8 +54,7 @@ def workflow(project, exp, args, subj_source):
     """
 
     # Create workflow in function defined elsewhere in this package
-    preproc, preproc_input, preproc_output = create_preprocessing_workflow(
-                                                exp_info=exp)
+    preproc, preproc_input, preproc_output = workflow_spec(exp_info=exp)
 
     # Collect raw nifti data
     preproc_templates = dict(timeseries=exp["func_template"],
@@ -90,7 +88,7 @@ def workflow(project, exp, args, subj_source):
     return preproc
 
 
-def create_preprocessing_workflow(name="preproc", exp_info=None):
+def workflow_spec(name="preproc", exp_info=None):
     """Return a Nipype workflow for fMRI preprocessing.
 
     Parameters
@@ -128,7 +126,7 @@ def create_preprocessing_workflow(name="preproc", exp_info=None):
     preproc = Workflow(name)
 
     if exp_info is None:
-        exp_info = fitz.default_experiment_parameters()
+        exp_info = fitz.default_experiment_parameters
 
     # Define the inputs for the preprocessing workflow
     in_fields = ["timeseries", "subject_id", "anat"]

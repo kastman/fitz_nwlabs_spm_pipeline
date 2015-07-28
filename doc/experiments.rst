@@ -16,7 +16,7 @@ this file; to see these defaults, run the following code::
 
     In [1]: import fitz
 
-    In [2]: print fitz.default_experiment_parameters()
+    In [2]: print fitz.default_experiment_parameters
 
 Preprocessing Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~

@@ -23,17 +23,16 @@ import fitz
 # from nibabel import load as nib_load, Nifti1Pair
 
 
-def default_parameters():
-    return dict(
-        offsets=None,
-        series_descriptions=[],
-        server=None,
-        out_ext='.nii',
-        sanitize_wildcard=True,
-    )
+default_parameters = dict(
+    offsets=None,
+    series_descriptions=[],
+    server=None,
+    out_ext='.nii',
+    sanitize_wildcard=True,
+)
 
 
-def workflow(project, exp, args, subj_source):
+def workflow_manager(project, exp, args, subj_source):
     """
     # ------------------------------------------- #
     # Xnat Download and Nifti Conversion Workflow #
@@ -44,7 +43,7 @@ def workflow(project, exp, args, subj_source):
 
     # Create workflow in function defined elsewhere in this package
     (xnatconvert, xnatconvert_input,
-        xnatconvert_output) = create_xnatconvert_subject_workflow(exp_info=exp)
+        xnatconvert_output) = workflow_spec(exp_info=exp)
 
     xnatconvert.connect([
         (subj_source, xnatconvert_input, [('subject_id', 'subject_id')])
@@ -66,7 +65,7 @@ def workflow(project, exp, args, subj_source):
     return xnatconvert
 
 
-def create_xnatconvert_subject_workflow(name="xnatconvert", exp_info=None):
+def workflow_spec(name="xnatconvert", exp_info=None):
     """Return a Nipype workflow for XNAT Download and Conversion.
 
     Parameters
@@ -84,7 +83,7 @@ def create_xnatconvert_subject_workflow(name="xnatconvert", exp_info=None):
          outputnode.images    : List of output image NIfTIs
     """
     if exp_info is None:
-        exp_info = fitz.default_experiment_parameters()
+        exp_info = fitz.default_experiment_parameters
 
     # Define the inputs for the preprocessing workflow
     in_fields = ['subject_id',
