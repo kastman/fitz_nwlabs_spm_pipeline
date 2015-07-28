@@ -27,7 +27,9 @@ def default_parameters():
     return dict(
         offsets=None,
         series_descriptions=[],
-        server=None
+        server=None,
+        out_ext='.nii',
+        sanitize_wildcard=True,
     )
 
 
@@ -112,7 +114,8 @@ def create_xnatconvert_subject_workflow(name="xnatconvert", exp_info=None):
 
     inputnode.inputs.server_alias = exp_info['server_alias']
 
-    pattern_flow = create_xnatconvert_flow(name='xnatconvert_subflow')
+    pattern_flow = create_xnatconvert_flow(exp_info=exp_info,
+                                           name='xnatconvert_subflow')
 
     xnatconvert_subject = Workflow(name)
     xnatconvert_subject.connect([
@@ -150,11 +153,11 @@ def flatten_list(nested_list):
     return [item for sublist in nested_list for item in sublist]
 
 
-def create_xnatconvert_flow(name):
+def create_xnatconvert_flow(exp_info, name='xnatconvert_flow'):
     xnatIdent = create_serverconfig(name='xnatServerConfig')
-    xnatSearch = create_search(name='xnatSearch')
+    xnatSearch = create_search(exp_info, name='xnatSearch')
     xnatSource = create_source(name='xnatSource')
-    convert = create_convert(name='convert')
+    convert = create_convert(exp_info, name='convert')
 
     workflow = pe.Workflow(name=name)
     workflow.connect([
@@ -206,10 +209,11 @@ def create_serverconfig(name):
     return config
 
 
-def create_search(name):
+def create_search(exp_info, name):
     search = pe.MapNode(interface=XnatSearchInterface(),
                         iterfield=['desc_pattern', 'series_offset'],
                         name=name)
+    search.inputs.sanitize_wildcard = exp_info['sanitize_wildcard']
     return search
 
 
@@ -226,14 +230,14 @@ def create_source(name):
     return source
 
 
-def create_convert(name):
+def create_convert(exp_info, name):
     ''' Use the Dicomstack Interface to store DICOM Header information into the
         extended NIfTI header.
         Output Format is unzipped n+1 (SPM-preferred).
     '''
     convert = pe.MapNode(interface=dcmstack.DcmStack(), name=name,
                          iterfield=['dicom_files'])
-    convert.inputs.out_ext = '.nii'
+    convert.inputs.out_ext = exp_info['out_ext']
     convert.inputs.embed_meta = True
 
     return convert
