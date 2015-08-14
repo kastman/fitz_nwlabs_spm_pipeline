@@ -29,6 +29,7 @@ default_parameters = dict(
     server=None,
     out_ext='.nii',
     sanitize_wildcard=True,
+    cache_dir='/scratch/DICOM',
 )
 
 
@@ -155,7 +156,7 @@ def flatten_list(nested_list):
 def create_xnatconvert_flow(exp_info, name='xnatconvert_flow'):
     xnatIdent = create_serverconfig(name='xnatServerConfig')
     xnatSearch = create_search(exp_info, name='xnatSearch')
-    xnatSource = create_source(name='xnatSource')
+    xnatSource = create_source(exp_info, name='xnatSource')
     convert = create_convert(exp_info, name='convert')
 
     workflow = pe.Workflow(name=name)
@@ -216,7 +217,7 @@ def create_search(exp_info, name):
     return search
 
 
-def create_source(name):
+def create_source(exp_info, name):
     source = pe.Node(interface=nio.XNATSource(
             infields=['xnat_project', 'subject_id', 'exam_id', 'scan'],
             outfields=['dicoms']),
@@ -225,7 +226,7 @@ def create_source(name):
                                     '%s/scans/%d/resources/files')
     source.inputs.query_template_args['dicoms'] = [[
         'xnat_project', 'subject_id', 'exam_id', 'scan']]
-
+    source.inputs.cache_dir = exp_info['cache_dir']
     return source
 
 
@@ -358,9 +359,8 @@ class XnatSearchInterface(BaseInterface):
               ('xnat:mrScanData/QUALITY', '=', 'usable'),
               'AND'])
 
-        """[('120613_PrP004', '5', 'usable'),
-            ('120613_PrP004', '14', 'usable'),
-            ('120613_PrP004', '21', 'usable')]
+        """[('S04272', 'E01333', 'M87115017', '14', 'usable'),
+            ('S04272', 'E01333', 'M87115017', '15', 'usable')]
         """
         if len(results.items()) == 0:
             raise LookupError("No scans found using %s and %s" % (
