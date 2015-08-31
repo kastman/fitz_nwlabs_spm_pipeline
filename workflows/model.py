@@ -44,9 +44,7 @@ def workflow_manager(project, exp, args, subj_source):
 
     model_base = op.join(project['analysis_dir'], "{subject_id}")
     model_templates = dict(
-        timeseries=op.join(model_base, "preproc",
-                           'sw*%s*.img' % op.splitext(
-                                op.basename(exp["source_template"]))[0]),
+        timeseries=op.join(model_base, "preproc", 'sw*.img'),
         realignment_params=op.join(model_base, "preproc", "rp*.txt"),
         onset_files=op.join(model_base, "models",
                             exp["model_name"], "onset",
