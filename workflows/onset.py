@@ -22,8 +22,10 @@ default_parameters = dict(
     onset_col='onset',
     run_col='run',
     pmod_cols=[],
+    pmod_conditions=[],
     concatenate_runs=False
 )
+
 
 def workflow_manager(project, exp, args, subj_source):
     # ----------------------------------------------------------------------- #
@@ -80,6 +82,7 @@ def workflow_spec(name="onset", exp_info=None):
     onsetsetup.inputs.onset_col = exp_info['onset_col']
     onsetsetup.inputs.run_col = exp_info['run_col']
     onsetsetup.inputs.pmod_cols = exp_info['pmod_cols']
+    onsetsetup.inputs.pmod_conditions = exp_info['pmod_conditions']
     onsetsetup.inputs.concatenate_runs = exp_info['concatenate_runs']
 
     # Define the workflow outputs
@@ -110,6 +113,7 @@ class OnsetSetupInput(BaseInterfaceInputSpec):
     onset_col = traits.Str('onset', use_default=True)
     duration_col = traits.Str('duration', use_default=True)
     pmod_cols = traits.List([], use_default=True)
+    pmod_conditions = traits.List([], use_default=True)
     concatenate_runs = traits.Bool(False, use_default=True)
 
 
@@ -135,21 +139,25 @@ class OnsetSetup(BaseInterface):
             onset_col=self.inputs.onset_col,
             duration_col=self.inputs.duration_col,
             pmod_cols=self.inputs.pmod_cols,
+            pmod_conditions=self.inputs.pmod_conditions,
             run_col=self.inputs.run_col,
             concatenate_runs=self.inputs.concatenate_runs)
 
         return runtime
 
     def _mats_from_csv(self, design_file, conditions, condition_col,
-                       onset_col, duration_col, pmod_cols, run_col,
-                       concatenate_runs):
+                       onset_col, duration_col, pmod_cols, pmod_conditions,
+                       run_col, concatenate_runs):
         runs_df = pd.read_csv(design_file)
         if not len(conditions):
             conditions = runs_df[condition_col].unique()
 
+        if not len(pmod_conditions):
+            pmod_conditions = conditions
+
         # Check to make sure pmods are valid
         self._check_pmod_values(pmod_cols, condition_col, runs_df,
-                                concatenate_runs, run_col)
+                                concatenate_runs, run_col, pmod_conditions)
 
         outfiles = []
         for r, run_df in runs_df.groupby(run_col):
@@ -157,7 +165,7 @@ class OnsetSetup(BaseInterface):
             for cond in conditions:
                 onsets = self.onsets_for(cond, run_df, condition_col,
                                          onset_col, duration_col, run_col,
-                                         pmod_cols)
+                                         pmod_cols, pmod_conditions)
                 if onsets:  # Don't append 0-length onsets
                     infolist.append(onsets)
             outfile = '%s-%s_run%d.mat' % (
@@ -171,7 +179,7 @@ class OnsetSetup(BaseInterface):
 
     def onsets_for(self, cond, run_df, condition_col='condition',
                    onset_col='onset', duration_col='duration', run_col='run',
-                   pmod_cols=[]):
+                   pmod_cols=[], pmod_conditions=[]):
         """
         Inputs:
           * Condition Label to grab onsets, durations & amplitudes / values.
@@ -197,6 +205,7 @@ class OnsetSetup(BaseInterface):
                 durations=durations,
                 onsets=cond_df[onset_col].tolist(),
             )
+            # print cond, condinfo
 
             pmods = []
             # Use lyman-style "value" as a pmod.
@@ -209,16 +218,21 @@ class OnsetSetup(BaseInterface):
                     param=cond_df['value'].tolist(),
                 ))
 
-            for pmod_col in pmod_cols:
-                pmod_label = self._strip_pmod_label(pmod_col)
-                pmods.append(dict(
-                    name=pmod_label,
-                    poly=1,
-                    param=cond_df[pmod_col].tolist(),
-                ))
+            # print pmod_conditions
+            # print 'check cond ' + cond
+            if cond in pmod_conditions:
+                for pmod_col in pmod_cols:
+                    # print pmod_col, cond
+                    pmod_label = self._strip_pmod_label(pmod_col)
+                    pmods.append(dict(
+                        name=pmod_label,
+                        poly=1,
+                        param=cond_df[pmod_col].tolist(),
+                    ))
             if len(pmods):
                 condinfo['pmod'] = pmods
         else:
+            print 'Empty onsets for ' + cond
             condinfo = None
         return condinfo
 
@@ -231,7 +245,7 @@ class OnsetSetup(BaseInterface):
         return pmod_label
 
     def _check_pmod_values(self, pmod_cols, condition_col, runs_df,
-                           concatenate_runs, run_col):
+                           concatenate_runs, run_col, pmod_conditions):
         """Check to make sure pmods are valid
             For each pmod column, make sure there are multiple values per
             condition, or else the columns won't be estimable in the model."""
@@ -244,6 +258,9 @@ class OnsetSetup(BaseInterface):
                 label_names = ('run', 'condition')
 
             for labels, df in runs_df.groupby(cols):
+                # Only check for conditions that we want to create pmods for
+                if labels[-1] not in pmod_conditions:
+                    continue
                 pmod_vals = df[pmod_col].unique()
                 if len(pmod_vals) == 1:  # Only one value
                     msg = ('Unestimable Pmod %s: only one value ' % pmod_col +
