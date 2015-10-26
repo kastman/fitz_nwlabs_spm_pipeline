@@ -29,7 +29,8 @@ import fitz
 default_parameters = dict(
     condition_names=[],
     contrasts=[],
-    concatenate_runs=False
+    concatenate_runs=False,
+    mask_image=None
 )
 
 
@@ -201,6 +202,8 @@ def create_level1design(exp_info, name='level1design'):
     level1design.inputs.timing_units = exp_info['output_units']
     level1design.inputs.bases = exp_info['bases']
     level1design.inputs.interscan_interval = exp_info['TR']
+    if exp_info['mask_image']:
+        level1design.inputs.mask_image = exp_info['mask_image']
     return level1design
 
 
