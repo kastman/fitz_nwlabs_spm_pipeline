@@ -167,7 +167,7 @@ def workflow_spec(name="preproc", exp_info=None):
     apply_deform_struct = create_apply_deformation(spminfo,
                                                    'apply_deform_struct')
 
-    smooth = create_smooth()
+    smooth = create_smooth(fwhm=exp_info["smooth_fwhm"])
 
     # # Save the experiment info for this run
     # saveparams = MapNode(SaveParameters(exp_info=exp_info),
@@ -388,12 +388,12 @@ def create_smooth(fwhm=6, name='smooth'):
     return smooth
 
 
-def create_artifactdetect(name='art'):
+def create_artifactdetect(name='art', exp_info=None):
     art = pe.Node(interface=ra.ArtifactDetect(), name=name)
     art.inputs.use_differences = [True, False]
     art.inputs.use_norm = True
-    art.inputs.norm_threshold = 1
-    art.inputs.zintensity_threshold = 3
+    art.inputs.norm_threshold = exp_info['motion_threshold']
+    art.inputs.zintensity_threshold = exp_info['intensity_threshold']
     art.inputs.mask_type = 'spm_global'
     art.inputs.parameter_source = 'SPM'
     art.inputs.save_plot = False  # Don't save plots when running on cluster
