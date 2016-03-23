@@ -153,7 +153,7 @@ def workflow_spec(name="preproc", exp_info=None):
 
     realign = create_realignment()
 
-    art = create_artifactdetect()
+    art = create_artifactdetect(exp_info=exp_info)
 
     # Estimate a registration from funtional to anatomical space
     coregister = create_coregister()

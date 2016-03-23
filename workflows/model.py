@@ -30,7 +30,8 @@ default_parameters = dict(
     condition_names=[],
     contrasts=[],
     concatenate_runs=False,
-    mask_image=None
+    mask_image=None,
+    include_motion=True
 )
 
 
@@ -125,8 +126,7 @@ def workflow_spec(name="model", exp_info=None):
         (inputnode, load_onsets,
             [('onset_files', 'onset_files')]),
         (inputnode, modelspec,
-            [('realignment_params', 'realignment_parameters'),
-             ('timeseries', 'functional_runs'),
+            [('timeseries', 'functional_runs'),
              ('outlier_files', 'outlier_files')]),
         (load_onsets, modelspec,
             [('onsets_infos', 'subject_info')]),
@@ -139,6 +139,12 @@ def workflow_spec(name="model", exp_info=None):
              ('beta_images', 'beta_images'),
              ('residual_image', 'residual_image')]),
     ])
+
+    if exp_info['include_motion']:
+        model.connect([
+            (inputnode, modelspec,
+                [('realignment_params', 'realignment_parameters')])
+        ])
 
     # Define the workflow outputs
     outputnode = Node(IdentityInterface(["beta_images",
